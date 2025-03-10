@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام الحجز</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            direction: rtl;
+            text-align: center;
+            background: linear-gradient(to right, #1e3c72, #2a5298);
+            color: white;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 900px;
+            margin: auto;
+            padding: 20px;
+        }
+        .day-card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            margin: 10px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .btn {
+            padding: 12px;
+            margin: 5px;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 16px;
+            transition: 0.3s;
+        }
+        .btn-blue { background-color: #3498db; color: white; }
+        .btn-red { background-color: #e74c3c; color: white; }
+        .btn-green { background-color: #2ecc71; color: white; }
+        .btn:hover { opacity: 0.8; }
+        input {
+            padding: 10px;
+            margin: 10px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>نظام حجز الشفتات</h2>
+        <div id="login-screen">
+            <input type="text" id="userName" placeholder="أدخل اسمك">
+            <button class="btn btn-blue" onclick="handleLogin()">تسجيل الدخول</button>
+        </div>
+        <div id="booking-screen" style="display: none;">
+            <h3 id="welcome-msg"></h3>
+            <div id="weeks-container"></div>
+            <button class="btn btn-green" onclick="handleSave()">حفظ</button>
+        </div>
+    </div>
+    <script>
+        const scriptURL = "https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec";
+        let userName = localStorage.getItem("userName") || "";
+        let bookings = {};
+        const maxShifts = 3;
+        const weeks = [["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس"],
+                       ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس"],
+                       ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس"]];
+        const sections = ["رجال", "حريم", "استقبال", "عيادة", "علاج نفسي", "علاج إدمان"];
+
+        function handleLogin() {
+            userName = document.getElementById("userName").value.trim();
+            if (!userName) return;
+            localStorage.setItem("userName", userName);
+            document.getElementById("login-screen").style.display = "none";
+            document.getElementById("booking-screen").style.display = "block";
+            document.getElementById("welcome-msg").innerText = `مرحبًا، ${userName}!`;
+            fetchBookings();
+        }
+
+        function getSelectedShiftsCount() {
+            return Object.keys(bookings).length;
+        }
+
+        function renderWeeks() {
+            const container = document.getElementById("weeks-container");
+            container.innerHTML = "";
+            weeks.forEach((week, weekIndex) => {
+                let weekDiv = document.createElement("div");
+                weekDiv.innerHTML = `<h3>الأسبوع ${weekIndex + 1}</h3>`;
+                week.forEach(day => {
+                    let dayDiv = document.createElement("div");
+                    dayDiv.classList.add("day-card");
+                    dayDiv.innerHTML = `<h4>${day}</h4>`;
+                    sections.forEach(section => {
+                        let btn = document.createElement("button");
+                        btn.classList.add("btn", "btn-blue");
+                        btn.innerText = section;
+                        btn.onclick = () => toggleBooking(weekIndex, day, section, btn);
+                        dayDiv.appendChild(btn);
+                    });
+                    weekDiv.appendChild(dayDiv);
+                });
+                container.appendChild(weekDiv);
+            });
+        }
+
+        function toggleBooking(week, day, section, btn) {
+            const key = `${week}-${day}-${section}`;
+            let selectedShifts = getSelectedShiftsCount();
+
+            if (bookings[key]) {
+                delete bookings[key];
+                btn.classList.remove("btn-red");
+                btn.classList.add("btn-blue");
+            } else {
+                if (selectedShifts >= maxShifts) {
+                    alert("❌ لا يمكنك اختيار أكثر من 3 شفتات!");
+                    return;
+                }
+                bookings[key] = userName;
+                btn.classList.remove("btn-blue");
+                btn.classList.add("btn-red");
+            }
+        }
+
+        function handleSave() {
+            if (getSelectedShiftsCount() !== maxShifts) {
+                alert("⚠️ يجب اختيار 3 شفتات بالضبط قبل الحفظ!");
+                return;
+            }
+            Object.keys(bookings).forEach(key => {
+                let [week, day, section] = key.split("-");
+                fetch(scriptURL, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ user: userName, week, day, shift: section })
+                });
+            });
+            alert("✅ تم حفظ اختياراتك بنجاح!");
+        }
+
+        function fetchBookings() {
+            fetch(scriptURL)
+                .then(response => response.json())
+                .then(data => console.log("تم استرجاع البيانات:", data))
+                .catch(error => console.error("❌ خطأ في استرجاع البيانات", error));
+            renderWeeks();
+        }
+
+        if (userName) handleLogin();
+    </script>
+</body>
+</html>
